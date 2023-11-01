@@ -32,7 +32,7 @@ params="$DATADIR \
         --weight-decay 0.0 \
         --criterion label_smoothed_cross_entropy \
         --label-smoothing 0.1 \
-        --max-tokens 4096 \
+        --max-tokens 256 \
         --max-update 20000 \
 	--no-progress-bar \
 	--log-format json \
