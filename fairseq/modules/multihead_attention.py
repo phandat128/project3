@@ -79,6 +79,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         self_attention=False,
         encoder_decoder_attention=False,
         dictionary=None,
+        rope=True,
         q_noise=0.0,
         qn_block_size=8,
         # TODO: pass in config rather than string.
@@ -112,6 +113,9 @@ class MultiheadAttention(FairseqIncrementalDecoder):
             self.head_dim * num_heads == self.embed_dim
         ), "embed_dim must be divisible by num_heads"
         self.scaling = self.head_dim**-0.5
+
+        self.rope = rope
+        self.theta = 1.0 / (10000 ** (torch.arange(0, self.head_dim, 2).float() / self.head_dim)) if rope else None
 
         self.self_attention = self_attention
         self.encoder_decoder_attention = encoder_decoder_attention
@@ -514,51 +518,51 @@ class MultiheadAttention(FairseqIncrementalDecoder):
                 assert value is not None
                 assert src_len, key_bsz == value.shape[:2]
 
-        if (
-            not self.onnx_trace
-            and not is_tpu  # don't use PyTorch version on TPUs
-            and incremental_state is None
-            and not static_kv
-            # A workaround for quantization to work. Otherwise JIT compilation
-            # treats bias in linear module as method.
-            and not torch.jit.is_scripting()
-            # The Multihead attention implemented in pytorch forces strong dimension check
-            # for input embedding dimention and K,Q,V projection dimension.
-            # Since pruning will break the dimension check and it is not easy to modify the pytorch API,
-            # it is preferred to bypass the pytorch MHA when we need to skip embed_dim_check
-            and not self.skip_embed_dim_check
-        ):
-            assert key is not None and value is not None
-
-            if self.use_xformers:
-                return self._xformers_attn_forward(
-                    query, key, value, key_padding_mask, need_weights, attn_mask
-                )
-
-            else:
-                return F.multi_head_attention_forward(
-                    query,
-                    key,
-                    value,
-                    self.embed_dim,
-                    self.num_heads,
-                    torch.empty([0]),
-                    torch.cat((self.q_proj.bias, self.k_proj.bias, self.v_proj.bias)),
-                    self.bias_k,
-                    self.bias_v,
-                    self.add_zero_attn,
-                    self.dropout_module.p,
-                    self.out_proj.weight,
-                    self.out_proj.bias,
-                    self.training or self.dropout_module.apply_during_inference,
-                    key_padding_mask.bool() if key_padding_mask is not None else None,
-                    need_weights,
-                    attn_mask,
-                    use_separate_proj_weight=True,
-                    q_proj_weight=self.q_proj.weight,
-                    k_proj_weight=self.k_proj.weight,
-                    v_proj_weight=self.v_proj.weight,
-                )
+        # if (
+        #     not self.onnx_trace
+        #     and not is_tpu  # don't use PyTorch version on TPUs
+        #     and incremental_state is None
+        #     and not static_kv
+        #     # A workaround for quantization to work. Otherwise JIT compilation
+        #     # treats bias in linear module as method.
+        #     and not torch.jit.is_scripting()
+        #     # The Multihead attention implemented in pytorch forces strong dimension check
+        #     # for input embedding dimention and K,Q,V projection dimension.
+        #     # Since pruning will break the dimension check and it is not easy to modify the pytorch API,
+        #     # it is preferred to bypass the pytorch MHA when we need to skip embed_dim_check
+        #     and not self.skip_embed_dim_check
+        # ):
+        #     assert key is not None and value is not None
+        #
+        #     if self.use_xformers:
+        #         return self._xformers_attn_forward(
+        #             query, key, value, key_padding_mask, need_weights, attn_mask
+        #         )
+        #
+        #     else:
+        #         return F.multi_head_attention_forward(
+        #             query,
+        #             key,
+        #             value,
+        #             self.embed_dim,
+        #             self.num_heads,
+        #             torch.empty([0]),
+        #             torch.cat((self.q_proj.bias, self.k_proj.bias, self.v_proj.bias)),
+        #             self.bias_k,
+        #             self.bias_v,
+        #             self.add_zero_attn,
+        #             self.dropout_module.p,
+        #             self.out_proj.weight,
+        #             self.out_proj.bias,
+        #             self.training or self.dropout_module.apply_during_inference,
+        #             key_padding_mask.bool() if key_padding_mask is not None else None,
+        #             need_weights,
+        #             attn_mask,
+        #             use_separate_proj_weight=True,
+        #             q_proj_weight=self.q_proj.weight,
+        #             k_proj_weight=self.k_proj.weight,
+        #             v_proj_weight=self.v_proj.weight,
+        #         )
 
         if incremental_state is not None:
             saved_state = self._get_input_buffer(incremental_state)
@@ -612,6 +616,8 @@ class MultiheadAttention(FairseqIncrementalDecoder):
             .view(tgt_len, bsz * self.num_heads, self.head_dim)
             .transpose(0, 1)
         )
+        if self.rope:
+            q = self.apply_rotary(q)
         kv_bsz = bsz  # need default value for scripting
         if k is not None:
             kv_bsz = k.size(1)
@@ -620,6 +626,8 @@ class MultiheadAttention(FairseqIncrementalDecoder):
                 .view(-1, kv_bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
+            if self.rope:
+                k = self.apply_rotary(k)
         if v is not None:
             v = (
                 v.contiguous()
@@ -908,3 +916,15 @@ class MultiheadAttention(FairseqIncrementalDecoder):
 
         for key, value in items_to_add.items():
             state_dict[key] = value
+
+    def gen_sinusoidal_pos(self, seq_len):
+        assert self.theta is not None
+        t = torch.arange(seq_len).type_as(self.theta)
+        arc = torch.einsum('i,j->ij', t, self.theta).unsqueeze(0)  # 1 x T x h_dim/2
+        return arc.sin(), arc.cos()
+
+    def apply_rotary(self, x):  # x: (B*h) x T x dim
+        sin, cos = self.gen_sinusoidal_pos(x.size(-2))  # sin, cos: 1 x T x dim/2
+        x1, x2 = x[..., 0::2], x[..., 1::2]
+        return torch.stack([x1 * cos - x2 * sin, x2 * cos + x1 * sin], dim=-1).flatten(-2)
+
