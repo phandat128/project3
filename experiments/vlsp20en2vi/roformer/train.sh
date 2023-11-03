@@ -27,7 +27,7 @@ params="$DATADIR \
 --save-interval-updates 500 \
 --keep-interval-updates 1 \
 --update-freq 4 \
---rope \
+--rotary-embedding \
 --no-token-positional-embeddings
 "
 
