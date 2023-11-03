@@ -141,7 +141,7 @@ class TransformerEncoderLayerBase(nn.Module):
             q_noise=self.quant_noise,
             qn_block_size=self.quant_noise_block_size,
             xformers_att_config=cfg.encoder.xformers_att_config,
-            rope=cfg.rope
+            rotary_embedding=cfg.rotary_embedding
         )
 
     def residual_connection(self, x, residual):
@@ -361,7 +361,7 @@ class TransformerDecoderLayerBase(nn.Module):
             q_noise=self.quant_noise,
             qn_block_size=self.quant_noise_block_size,
             xformers_att_config=cfg.decoder.xformers_att_config,
-            rope=cfg.rope
+            rotary_embedding=cfg.rotary_embedding
         )
 
     def build_encoder_attention(self, embed_dim, cfg):
@@ -375,7 +375,7 @@ class TransformerDecoderLayerBase(nn.Module):
             q_noise=self.quant_noise,
             qn_block_size=self.quant_noise_block_size,
             xformers_att_config=cfg.encoder.xformers_att_config,
-            rope=cfg.rope
+            rotary_embedding=cfg.rotary_embedding
         )
 
     def prepare_for_onnx_export_(self):

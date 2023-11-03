@@ -210,7 +210,7 @@ class TransformerConfig(FairseqDataclass):
         },
     )
     # args for rotary embeddings
-    rope: bool = field(
+    rotary_embedding: bool = field(
         default=False, metadata={"help": "whether use rotary embedding or not"}
     )
     # DEPRECATED field, but some old checkpoints might have it
