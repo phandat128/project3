@@ -3,8 +3,8 @@ src=en
 tgt=vi
 PROJ_PATH=./experiments/vlsp20${src}2${tgt}
 DATA_PATH=./data/vlsp20envi/corpus/vlsp20en2vi
-CKPT_PATH=$PROJ_PATH/transformer/train_log
-MODEL_DIR=$PROJ_PATH/transformer
+CKPT_PATH=$PROJ_PATH/roformer/train_log
+MODEL_DIR=$PROJ_PATH/roformer
 OUTPUT_FN=$MODEL_DIR/res.txt
 
 mkdir -p $MODEL_DIR/outputs

@@ -79,7 +79,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         self_attention=False,
         encoder_decoder_attention=False,
         dictionary=None,
-        rope=True,
+        rotary_embedding=False,
         q_noise=0.0,
         qn_block_size=8,
         # TODO: pass in config rather than string.
@@ -114,8 +114,9 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         ), "embed_dim must be divisible by num_heads"
         self.scaling = self.head_dim**-0.5
 
-        self.rope = rope
-        self.theta = 1.0 / (10000 ** (torch.arange(0, self.head_dim, 2).float() / self.head_dim)) if rope else None
+        self.rotary_embedding = rotary_embedding
+        self.theta = 1.0 / (10000 ** (torch.arange(0, self.head_dim, 2).float() / self.head_dim)) if rotary_embedding \
+            else None
 
         self.self_attention = self_attention
         self.encoder_decoder_attention = encoder_decoder_attention
@@ -616,7 +617,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
             .view(tgt_len, bsz * self.num_heads, self.head_dim)
             .transpose(0, 1)
         )
-        if self.rope:
+        if self.rotary_embedding:
             q = self.apply_rotary(q)
         kv_bsz = bsz  # need default value for scripting
         if k is not None:
@@ -626,7 +627,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
                 .view(-1, kv_bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
-            if self.rope:
+            if self.rotary_embedding:
                 k = self.apply_rotary(k)
         if v is not None:
             v = (
@@ -925,6 +926,8 @@ class MultiheadAttention(FairseqIncrementalDecoder):
 
     def apply_rotary(self, x):  # x: (B*h) x T x dim
         sin, cos = self.gen_sinusoidal_pos(x.size(-2))  # sin, cos: 1 x T x dim/2
+        sin = sin.to(x.device)
+        cos = cos.to(x.device)
         x1, x2 = x[..., 0::2], x[..., 1::2]
         return torch.stack([x1 * cos - x2 * sin, x2 * cos + x1 * sin], dim=-1).flatten(-2)
 

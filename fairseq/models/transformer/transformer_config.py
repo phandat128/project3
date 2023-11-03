@@ -209,6 +209,10 @@ class TransformerConfig(FairseqDataclass):
             "--offload-activations are passed."
         },
     )
+    # args for rotary embeddings
+    rope: bool = field(
+        default=False, metadata={"help": "whether use rotary embedding or not"}
+    )
     # DEPRECATED field, but some old checkpoints might have it
     char_inputs: bool = field(
         default=False, metadata={"help": "if set, model takes character ids as input"}
