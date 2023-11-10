@@ -9,7 +9,7 @@ OUTPUT_FN=$MODEL_DIR/res.txt
 
 mkdir -p $MODEL_DIR/outputs
 
-for split in test long_test; do
+for split in test test1; do
   fairseq-generate $DATA_PATH \
           --gen-subset $split \
           --path $CKPT_PATH/checkpoint_last.pt \

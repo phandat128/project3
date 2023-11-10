@@ -929,5 +929,5 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         sin = sin.to(x.device)
         cos = cos.to(x.device)
         x1, x2 = x[..., 0::2], x[..., 1::2]
-        return torch.stack([x1 * cos - x2 * sin, x2 * cos + x1 * sin], dim=-1).flatten(-2)
+        return torch.stack([x1 * cos - x2 * sin, x2 * cos + x1 * sin], dim=-1).flatten(-2).type_as(x)
 
