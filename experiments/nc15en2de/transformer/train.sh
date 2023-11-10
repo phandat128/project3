@@ -1,5 +1,5 @@
-DATADIR=./data/vlsp20envi/corpus/vlsp20en2vi
-CKPTS=./experiments/vlsp20en2vi/transformer/train_log
+DATADIR=./data/nc15ende/en2de
+CKPTS=./experiments/nc15en2de/transformer/train_log
 
 params="$DATADIR \
 --num-workers 2 \
@@ -18,7 +18,7 @@ params="$DATADIR \
 --weight-decay 0.0 \
 --criterion label_smoothed_cross_entropy \
 --label-smoothing 0.1 \
---max-tokens 2048 \
+--max-tokens 4096 \
 --max-update 20000 \
 --no-progress-bar \
 --log-format json \
