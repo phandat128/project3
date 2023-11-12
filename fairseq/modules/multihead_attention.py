@@ -23,10 +23,7 @@ from fairseq import utils
 from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.modules.quant_noise import quant_noise
 from fairseq.models.fairseq_incremental_decoder import FairseqIncrementalDecoder
-from fairseq.modules.rotary_positional_embedding import (
-    RotaryPositionalEmbedding,
-    apply_rotary_pos_emb,
-)
+
 
 # TODO: move this into xformers?
 # TODO: uint8 input type should just output a bool
@@ -122,8 +119,8 @@ class MultiheadAttention(FairseqIncrementalDecoder):
             theta = 1.0 / (10000 ** (torch.arange(0, self.head_dim, 2).float() / self.head_dim))
             self.register_buffer("theta", theta)
             self.seq_len_cached = 0
-            self.register_buffer("cos_cached", torch.empty(1, self.seq_len_cached, self.head_dim))
-            self.register_buffer("sin_cached", torch.empty(1, self.seq_len_cached, self.head_dim))
+            self.cos_cached = torch.empty(1, self.seq_len_cached, self.head_dim // 2)
+            self.sin_cached = torch.empty(1, self.seq_len_cached, self.head_dim // 2)
 
 
         self.self_attention = self_attention
