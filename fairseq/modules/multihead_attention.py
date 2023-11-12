@@ -23,7 +23,10 @@ from fairseq import utils
 from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.modules.quant_noise import quant_noise
 from fairseq.models.fairseq_incremental_decoder import FairseqIncrementalDecoder
-
+from fairseq.modules.rotary_positional_embedding import (
+    RotaryPositionalEmbedding,
+    apply_rotary_pos_emb,
+)
 
 # TODO: move this into xformers?
 # TODO: uint8 input type should just output a bool
@@ -115,8 +118,13 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         self.scaling = self.head_dim**-0.5
 
         self.rotary_embedding = rotary_embedding
-        self.theta = 1.0 / (10000 ** (torch.arange(0, self.head_dim, 2).float() / self.head_dim)) if rotary_embedding \
-            else None
+        if rotary_embedding:
+            theta = 1.0 / (10000 ** (torch.arange(0, self.head_dim, 2).float() / self.head_dim))
+            self.register_buffer("theta", theta)
+            self.seq_len_cached = 0
+            self.register_buffer("cos_cached", torch.empty(1, self.seq_len_cached, self.head_dim))
+            self.register_buffer("sin_cached", torch.empty(1, self.seq_len_cached, self.head_dim))
+
 
         self.self_attention = self_attention
         self.encoder_decoder_attention = encoder_decoder_attention
@@ -920,14 +928,19 @@ class MultiheadAttention(FairseqIncrementalDecoder):
 
     def gen_sinusoidal_pos(self, seq_len):
         assert self.theta is not None
-        t = torch.arange(seq_len).type_as(self.theta)
-        arc = torch.einsum('i,j->ij', t, self.theta).unsqueeze(0)  # 1 x T x h_dim/2
-        return arc.sin(), arc.cos()
+        if seq_len > self.seq_len_cached:
+            self.seq_len_cached = seq_len
+            t = torch.arange(seq_len).type_as(self.theta)
+            arc = torch.einsum('i,j->ij', t, self.theta).unsqueeze(0)  # 1 x T x h_dim/2
+            self.sin_cached = arc.sin()
+            self.cos_cached = arc.cos()
+        return self.sin_cached, self.cos_cached
 
     def apply_rotary(self, x):  # x: (B*h) x T x dim
-        sin, cos = self.gen_sinusoidal_pos(x.size(-2))  # sin, cos: 1 x T x dim/2
-        sin = sin.to(x.device)
-        cos = cos.to(x.device)
+        seq_len = x.size(1)
+        sin, cos = self.gen_sinusoidal_pos(seq_len)  # sin, cos: 1 x seq_len_cached x dim/2
+        sin = sin[:, :seq_len, :].to(x.device)
+        cos = cos[:, :seq_len, :].to(x.device)
         x1, x2 = x[..., 0::2], x[..., 1::2]
         return torch.stack([x1 * cos - x2 * sin, x2 * cos + x1 * sin], dim=-1).flatten(-2).type_as(x)
 
