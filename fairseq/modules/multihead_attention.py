@@ -122,7 +122,6 @@ class MultiheadAttention(FairseqIncrementalDecoder):
             self.cos_cached = torch.empty(1, self.seq_len_cached, self.head_dim // 2)
             self.sin_cached = torch.empty(1, self.seq_len_cached, self.head_dim // 2)
 
-
         self.self_attention = self_attention
         self.encoder_decoder_attention = encoder_decoder_attention
 
@@ -581,6 +580,15 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         else:
             saved_state = None
 
+        if self.rotary_embedding:
+            query = query.view(tgt_len, bsz * self.num_heads, self.head_dim).transpose(0, 1)
+            query = self.apply_rotary(query)
+            query = query.transpose(0, 1).view(tgt_len, bsz, -1)
+            if key is not None:
+                key = key.view(src_len, key_bsz * self.num_heads, self.head_dim).transpose(0, 1)
+                key = self.apply_rotary(key)
+                key = key.transpose(0, 1).view(src_len, key_bsz, -1)
+
         if self.self_attention:
             q = self.q_proj(query)
             k = self.k_proj(query)
@@ -622,8 +630,8 @@ class MultiheadAttention(FairseqIncrementalDecoder):
             .view(tgt_len, bsz * self.num_heads, self.head_dim)
             .transpose(0, 1)
         )
-        if self.rotary_embedding:
-            q = self.apply_rotary(q)
+        # if self.rotary_embedding:
+        #     q = self.apply_rotary(q)
         kv_bsz = bsz  # need default value for scripting
         if k is not None:
             kv_bsz = k.size(1)
@@ -632,8 +640,8 @@ class MultiheadAttention(FairseqIncrementalDecoder):
                 .view(-1, kv_bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
-            if self.rotary_embedding:
-                k = self.apply_rotary(k)
+            # if self.rotary_embedding:
+            #     k = self.apply_rotary(k)
         if v is not None:
             v = (
                 v.contiguous()
