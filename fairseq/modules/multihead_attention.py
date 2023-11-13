@@ -23,7 +23,10 @@ from fairseq import utils
 from fairseq.modules.fairseq_dropout import FairseqDropout
 from fairseq.modules.quant_noise import quant_noise
 from fairseq.models.fairseq_incremental_decoder import FairseqIncrementalDecoder
-
+from fairseq.modules.rotary_positional_embedding import (
+    RotaryPositionalEmbedding,
+    rotate_half
+)
 
 # TODO: move this into xformers?
 # TODO: uint8 input type should just output a bool
@@ -116,11 +119,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
 
         self.rotary_embedding = rotary_embedding
         if rotary_embedding:
-            theta = 1.0 / (10000 ** (torch.arange(0, self.head_dim, 2).float() / self.head_dim))
-            self.register_buffer("theta", theta)
-            self.seq_len_cached = 0
-            self.cos_cached = torch.empty(1, self.seq_len_cached, self.head_dim // 2)
-            self.sin_cached = torch.empty(1, self.seq_len_cached, self.head_dim // 2)
+            self.rotary_emb = RotaryPositionalEmbedding(self.head_dim)
 
         self.self_attention = self_attention
         self.encoder_decoder_attention = encoder_decoder_attention
@@ -581,13 +580,9 @@ class MultiheadAttention(FairseqIncrementalDecoder):
             saved_state = None
 
         if self.rotary_embedding:
-            query = query.view(tgt_len, bsz * self.num_heads, self.head_dim).transpose(0, 1)
             query = self.apply_rotary(query)
-            query = query.transpose(0, 1).view(tgt_len, bsz, -1)
             if key is not None:
-                key = key.view(src_len, key_bsz * self.num_heads, self.head_dim).transpose(0, 1)
                 key = self.apply_rotary(key)
-                key = key.transpose(0, 1).view(src_len, key_bsz, -1)
 
         if self.self_attention:
             q = self.q_proj(query)
@@ -931,21 +926,10 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         for key, value in items_to_add.items():
             state_dict[key] = value
 
-    def gen_sinusoidal_pos(self, seq_len):
-        assert self.theta is not None
-        if seq_len > self.seq_len_cached:
-            self.seq_len_cached = seq_len
-            t = torch.arange(seq_len).type_as(self.theta)
-            arc = torch.einsum('i,j->ij', t, self.theta).unsqueeze(0)  # 1 x T x h_dim/2
-            self.sin_cached = arc.sin()
-            self.cos_cached = arc.cos()
-        return self.sin_cached, self.cos_cached
-
-    def apply_rotary(self, x):  # x: (B*h) x T x dim
-        seq_len = x.size(1)
-        sin, cos = self.gen_sinusoidal_pos(seq_len)  # sin, cos: 1 x seq_len_cached x dim/2
-        sin = sin[:, :seq_len, :].to(x.device)
-        cos = cos[:, :seq_len, :].to(x.device)
-        x1, x2 = x[..., 0::2], x[..., 1::2]
-        return torch.stack([x1 * cos - x2 * sin, x2 * cos + x1 * sin], dim=-1).flatten(-2).type_as(x)
+    def apply_rotary(self, x):  # x: T x B x d_model
+        seq_len, bsz, _ = x.size()
+        cos, sin = self.rotary_emb(x, seq_len)  # cos, sin: T x 1 x 1 x head_dim
+        x = x.contiguous().view(seq_len, bsz, self.num_heads, self.head_dim)
+        rotated_x = x * cos + rotate_half(x) * sin
+        return rotated_x.contiguous().view(seq_len, bsz, -1)
 
