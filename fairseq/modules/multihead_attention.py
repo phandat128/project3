@@ -923,12 +923,11 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         for key, value in items_to_add.items():
             state_dict[key] = value
 
-    def apply_rotary(self, x):  # x: T x B x d_model
-        seq_len, bsz, _ = x.size()
-        cos, sin = self.rotary_emb(x, seq_len)  # cos, sin: T x 1 x 1 x head_dim
-        cos = cos[:seq_len, ...]
-        sin = sin[:seq_len, ...]
-        x = x.contiguous().view(seq_len, bsz, self.num_heads, self.head_dim)
+    def apply_rotary(self, x):  # x: (bsz*n_head) x T x head_dim
+        seq_len = x.size(1)
+        cos, sin = self.rotary_emb(x, seq_len).squeeze().unsqueeze(0)  # cos, sin: 1 x T x head_dim
+        cos = cos[:, :seq_len, :]
+        sin = sin[:, :seq_len, :]
         rotated_x = x * cos + rotate_half(x) * sin
-        return rotated_x.contiguous().view(seq_len, bsz, -1)
+        return rotated_x
 

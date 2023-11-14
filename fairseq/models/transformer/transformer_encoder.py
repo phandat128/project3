@@ -71,7 +71,7 @@ class TransformerEncoderBase(FairseqEncoder):
                 self.padding_idx,
                 learned=cfg.encoder.learned_pos,
             )
-            if not cfg.no_token_positional_embeddings
+            if not (cfg.no_token_positional_embeddings or cfg.rotary_embedding)
             else None
         )
         if cfg.layernorm_embedding:
