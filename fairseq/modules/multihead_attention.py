@@ -579,11 +579,6 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         else:
             saved_state = None
 
-        if self.rotary_embedding:
-            query = self.apply_rotary(query)
-            if key is not None:
-                key = self.apply_rotary(key)
-
         if self.self_attention:
             q = self.q_proj(query)
             k = self.k_proj(query)
@@ -625,8 +620,8 @@ class MultiheadAttention(FairseqIncrementalDecoder):
             .view(tgt_len, bsz * self.num_heads, self.head_dim)
             .transpose(0, 1)
         )
-        # if self.rotary_embedding:
-        #     q = self.apply_rotary(q)
+        if self.rotary_embedding:
+            q = self.apply_rotary(q)
         kv_bsz = bsz  # need default value for scripting
         if k is not None:
             kv_bsz = k.size(1)
@@ -635,14 +630,16 @@ class MultiheadAttention(FairseqIncrementalDecoder):
                 .view(-1, kv_bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
-            # if self.rotary_embedding:
-            #     k = self.apply_rotary(k)
+            if self.rotary_embedding:
+                k = self.apply_rotary(k)
         if v is not None:
             v = (
                 v.contiguous()
                 .view(-1, kv_bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
+            if self.rotary_embedding:
+                v = self.apply_rotary(v)
 
         if saved_state is not None:
             # saved states are stored with shape (bsz, num_heads, seq_len, head_dim)
@@ -929,6 +926,8 @@ class MultiheadAttention(FairseqIncrementalDecoder):
     def apply_rotary(self, x):  # x: T x B x d_model
         seq_len, bsz, _ = x.size()
         cos, sin = self.rotary_emb(x, seq_len)  # cos, sin: T x 1 x 1 x head_dim
+        cos = cos[:seq_len, ...]
+        sin = sin[:seq_len, ...]
         x = x.contiguous().view(seq_len, bsz, self.num_heads, self.head_dim)
         rotated_x = x * cos + rotate_half(x) * sin
         return rotated_x.contiguous().view(seq_len, bsz, -1)
