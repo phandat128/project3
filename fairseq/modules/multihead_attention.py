@@ -639,8 +639,6 @@ class MultiheadAttention(FairseqIncrementalDecoder):
                 .view(-1, kv_bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
-            if self.rotary_embedding:
-                v = self.apply_rotary(v)
 
         if saved_state is not None:
             # saved states are stored with shape (bsz, num_heads, seq_len, head_dim)
