@@ -924,9 +924,9 @@ class MultiheadAttention(FairseqIncrementalDecoder):
 
     def apply_rotary(self, x):  # x: (bsz*n_head) x T x head_dim
         seq_len = x.size(1)
-        cos, sin = self.rotary_emb(x, seq_len) # cos, sin: T x 1 x 1 x head_dim
-        cos = cos.squeeze()[:seq_len, :].unsqueeze(0)
-        sin = sin.squeeze()[:seq_len, :].unsqueeze(0)
+        cos, sin = self.rotary_emb(x, seq_len)  # cos, sin: T x 1 x 1 x head_dim
+        cos = cos.squeeze((1, 2))[:seq_len, :].unsqueeze(0)
+        sin = sin.squeeze((1, 2))[:seq_len, :].unsqueeze(0)
         rotated_x = x * cos + rotate_half(x) * sin
         return rotated_x
 
