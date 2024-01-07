@@ -15,7 +15,7 @@ params="$DATADIR \
 --lr-scheduler inverse_sqrt \
 --warmup-init-lr 1e-07 \
 --warmup-updates 8000 \
---lr 5e-4 \
+--lr 2e-4 \
 --weight-decay 0.0 \
 --criterion label_smoothed_cross_entropy \
 --label-smoothing 0.1 \
