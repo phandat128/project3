@@ -118,7 +118,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         self.scaling = self.head_dim**-0.5
 
         self.rotary_embedding = rotary_embedding
-        if rotary_embedding:
+        if rotary_embedding and self_attention:
             print("Using rotary positional embeddings")
             self.rotary_emb = RotaryPositionalEmbedding(self.head_dim)
 
@@ -621,8 +621,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
             .view(tgt_len, bsz * self.num_heads, self.head_dim)
             .transpose(0, 1)
         )
-        if self.rotary_embedding:
-            q = self.apply_rotary(q)
+
         kv_bsz = bsz  # need default value for scripting
         if k is not None:
             kv_bsz = k.size(1)
@@ -631,8 +630,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
                 .view(-1, kv_bsz * self.num_heads, self.head_dim)
                 .transpose(0, 1)
             )
-            if self.rotary_embedding:
-                k = self.apply_rotary(k)
+
         if v is not None:
             v = (
                 v.contiguous()
@@ -687,6 +685,10 @@ class MultiheadAttention(FairseqIncrementalDecoder):
             incremental_state = self._set_input_buffer(incremental_state, saved_state)
         assert k is not None
         assert k.size(1) == src_len
+
+        if self.rotary_embedding and self.self_attention:
+            q = self.apply_rotary(q)
+            k = self.apply_rotary(k)
 
         # This is part of a workaround to get around fork/join parallelism
         # not supporting Optional types.

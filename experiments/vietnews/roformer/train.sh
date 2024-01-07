@@ -3,6 +3,7 @@ CKPTS=./experiments/vietnews/transformer/train_log
 
 params="$DATADIR \
 --num-workers 2 \
+--ignore-unused-valid-subsets \
 --save-dir $CKPTS \
 --arch transformer \
 --dropout 0.3 \
