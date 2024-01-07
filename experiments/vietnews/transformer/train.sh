@@ -3,6 +3,7 @@ CKPTS=./experiments/vietnews/transformer/train_log
 
 params="$DATADIR \
 --num-workers 2 \
+--ignore-unused-valid-subsets \
 --save-dir $CKPTS \
 --arch transformer \
 --dropout 0.3 \
@@ -18,8 +19,8 @@ params="$DATADIR \
 --weight-decay 0.0 \
 --criterion label_smoothed_cross_entropy \
 --label-smoothing 0.1 \
---max-tokens 4096 \
---max-update 20000 \
+--max-tokens 8192 \
+--max-update 25000 \
 --no-progress-bar \
 --log-format json \
 --log-interval 100 \
@@ -33,5 +34,3 @@ params="$DATADIR \
 mkdir -p $CKPTS
 
 fairseq-train $params
-
-read -p "exit"

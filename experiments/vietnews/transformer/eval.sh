@@ -17,6 +17,7 @@ for split in test test1; do
   	      --remove-bpe \
           --beam 4 \
           --lenpen 0.6 \
+          --skip-invalid-size-inputs-valid-test \
           > $OUTPUT_FN
 
   # Extract source, predictions and ground truth
@@ -30,9 +31,6 @@ for split in test test1; do
   sed "s| '|'|g" $MODEL_DIR/outputs/truth.tok.$split | sed "s| /|/|g" | sed "s|/ |/|g" | sed "s| @ - @ |-|g" \
           > $MODEL_DIR/outputs/truth.$split
   rm $MODEL_DIR/outputs/preds.tok.$split $MODEL_DIR/outputs/truth.tok.$split
-
-  # Compute ROUGE
-  rouge -f $MODEL_DIR/outputs/preds.$split $MODEL_DIR/outputs/truth.$split --avg
 
 done
 
