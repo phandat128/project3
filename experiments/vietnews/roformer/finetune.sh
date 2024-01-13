@@ -1,11 +1,16 @@
 DATADIR=./data/vietnews/finetune-bin
-CKPTS=./experiments/vietnews/roformer/train_log
+CKPTS=./experiments/vietnews/roformer/train_log/checkpoint_last.pt
+FT_CKPTS=./experiments/vietnews/roformer/finetune_train_log
 
 params="$DATADIR \
---finetune-from-model \
 --num-workers 2 \
 --ignore-unused-valid-subsets \
---save-dir $CKPTS \
+--save-dir $FT_CKPTS \
+--restore-file $CKPTS \
+--reset-dataloader \
+--reset-lr-scheduler \
+--reset-meters \
+--reset-optimizer \
 --arch transformer \
 --dropout 0.3 \
 --share-all-embeddings \
@@ -21,7 +26,7 @@ params="$DATADIR \
 --criterion label_smoothed_cross_entropy \
 --label-smoothing 0.1 \
 --max-tokens 8192 \
---max-update 20000 \
+--max-update 1000 \
 --no-progress-bar \
 --log-format json \
 --log-interval 100 \
@@ -30,6 +35,8 @@ params="$DATADIR \
 --keep-interval-updates 1 \
 --update-freq 4 \
 --rotary-embedding \
+--scaling-type PI \
+--scaling-factor 2.0 \
 --fp16
 "
 
