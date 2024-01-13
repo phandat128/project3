@@ -213,6 +213,12 @@ class TransformerConfig(FairseqDataclass):
     rotary_embedding: bool = field(
         default=False, metadata={"help": "whether use rotary embedding or not"}
     )
+    scaling_type: str = field(
+        default=None, metadata={"help": "type of scaling RoPE for finetune models"}
+    )
+    scaling_factor: float = field(
+        default=1.0, metadata={"help": "scaling factor of scaling RoPE"}
+    )
     # DEPRECATED field, but some old checkpoints might have it
     char_inputs: bool = field(
         default=False, metadata={"help": "if set, model takes character ids as input"}

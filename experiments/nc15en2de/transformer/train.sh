@@ -33,5 +33,3 @@ params="$DATADIR \
 mkdir -p $CKPTS
 
 fairseq-train $params
-
-read -p "exit"

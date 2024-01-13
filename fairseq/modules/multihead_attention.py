@@ -71,6 +71,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
 
     def __init__(
         self,
+        cfg,
         embed_dim,
         num_heads,
         kdim=None,
@@ -97,6 +98,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
     ):
         super().__init__(dictionary)
 
+        self.cfg = cfg
         xformers_att_config = utils.eval_str_dict(xformers_att_config)
         self.use_xformers = xformers_att_config is not None
         if self.use_xformers and not _xformers_available:
@@ -120,7 +122,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         self.rotary_embedding = rotary_embedding
         if rotary_embedding and self_attention:
             print("Using rotary positional embeddings")
-            self.rotary_emb = RotaryPositionalEmbedding(self.head_dim)
+            self._init_rope()
 
         self.self_attention = self_attention
         self.encoder_decoder_attention = encoder_decoder_attention
@@ -170,6 +172,18 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         self.onnx_trace = False
         self.skip_embed_dim_check = False
         self.init_incremental_state()
+
+    def _init_rope(self):
+        if self.cfg.scaling_type is None:
+            self.rotary_emb = RotaryPositionalEmbedding(self.head_dim)
+        else:
+            scaling_type = self.cfg.scaling_type
+            scaling_factor = self.cfg.scaling_factor if self.cfg.scaling_factor is not None else 1.0
+            assert scaling_type in ['PI', 'NTKByParts', 'YARN'], "scaling_type must be in ['PI', 'NTKByParts', 'YARN']"
+            if scaling_type == 'PI':
+                self.rotary_emb = RotaryPositionalEmbedding(self.head_dim, scaling_factor=scaling_factor)
+            else:
+                raise ValueError("Scaling type is not supported yet")
 
     def prepare_for_onnx_export_(self):
         self.onnx_trace = True
@@ -926,9 +940,9 @@ class MultiheadAttention(FairseqIncrementalDecoder):
 
     def apply_rotary(self, x):  # x: (bsz*n_head) x T x head_dim
         seq_len = x.size(1)
-        cos, sin = self.rotary_emb(x, seq_len)  # cos, sin: T x 1 x 1 x head_dim
-        cos = cos.squeeze((1, 2))[:seq_len, :].unsqueeze(0)
-        sin = sin.squeeze((1, 2))[:seq_len, :].unsqueeze(0)
+        cos, sin = self.rotary_emb(x, seq_len)  # cos, sin: T x head_dim
+        cos = cos[:seq_len, :].unsqueeze(0)
+        sin = sin[:seq_len, :].unsqueeze(0)
         rotated_x = x * cos + rotate_half(x) * sin
         return rotated_x
 
