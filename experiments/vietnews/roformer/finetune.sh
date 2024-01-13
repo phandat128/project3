@@ -20,13 +20,13 @@ params="$DATADIR \
 --clip-norm 0.0 \
 --lr-scheduler inverse_sqrt \
 --warmup-init-lr 1e-07 \
---warmup-updates 8000 \
+--warmup-updates 2000 \
 --lr 1e-4 \
 --weight-decay 0.0 \
 --criterion label_smoothed_cross_entropy \
 --label-smoothing 0.1 \
---max-tokens 8192 \
---max-update 1000 \
+--max-tokens 4096 \
+--max-update 5000 \
 --no-progress-bar \
 --log-format json \
 --log-interval 100 \
