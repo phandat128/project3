@@ -27,6 +27,7 @@ from fairseq.modules.rotary_positional_embedding import (
     RotaryPositionalEmbedding,
     rotate_half
 )
+from fairseq.modules.scaled_rotary_positional_embedding import *
 
 # TODO: move this into xformers?
 # TODO: uint8 input type should just output a bool
@@ -179,9 +180,16 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         else:
             scaling_type = self.cfg.scaling_type
             scaling_factor = self.cfg.scaling_factor if self.cfg.scaling_factor is not None else 1.0
+            original_max_position_embeddings = self.cfg.original_max_position_embeddings
             assert scaling_type in ['PI', 'NTKByParts', 'YARN'], "scaling_type must be in ['PI', 'NTKByParts', 'YARN']"
             if scaling_type == 'PI':
                 self.rotary_emb = RotaryPositionalEmbedding(self.head_dim, scaling_factor=scaling_factor)
+            elif scaling_type == 'NTKByParts':
+                self.rotary_emb = PartNTKScaledRotaryEmbedding(self.head_dim, scale=scaling_factor,
+                                                               original_max_position_embeddings=original_max_position_embeddings)
+            elif scaling_type == 'YARN':
+                self.rotary_emb = YaRNScaledRotaryEmbedding(self.head_dim, scale=scaling_factor,
+                                                            original_max_position_embeddings=original_max_position_embeddings)
             else:
                 raise ValueError("Scaling type is not supported yet")
 
