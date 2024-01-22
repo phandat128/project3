@@ -709,7 +709,8 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         assert k.size(1) == src_len
 
         if self.rotary_embedding and self.self_attention:
-            q = self.apply_rotary(q)
+            q_offset = 0 if incremental_state is None else src_len-1
+            q = self.apply_rotary(q, offset=q_offset)
             k = self.apply_rotary(k)
 
         # This is part of a workaround to get around fork/join parallelism
@@ -946,11 +947,11 @@ class MultiheadAttention(FairseqIncrementalDecoder):
         for key, value in items_to_add.items():
             state_dict[key] = value
 
-    def apply_rotary(self, x):  # x: (bsz*n_head) x T x head_dim
+    def apply_rotary(self, x, offset=0):  # x: (bsz*n_head) x T x head_dim
         seq_len = x.size(1)
-        cos, sin = self.rotary_emb(x, seq_len)  # cos, sin: T x head_dim
-        cos = cos[:seq_len, :].unsqueeze(0)
-        sin = sin[:seq_len, :].unsqueeze(0)
+        cos, sin = self.rotary_emb(x, seq_len+offset)  # cos, sin: T x head_dim
+        cos = cos[offset: seq_len+offset, :].unsqueeze(0)
+        sin = sin[offset: seq_len+offset, :].unsqueeze(0)
         rotated_x = x * cos + rotate_half(x) * sin
         return rotated_x
 

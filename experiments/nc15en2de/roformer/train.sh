@@ -28,6 +28,7 @@ params="$DATADIR \
 --keep-interval-updates 1 \
 --update-freq 4 \
 --rotary-embedding \
+--no-token-positional-embeddings \
 --fp16
 "
 
