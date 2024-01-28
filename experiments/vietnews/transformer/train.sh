@@ -20,7 +20,7 @@ params="$DATADIR \
 --criterion label_smoothed_cross_entropy \
 --label-smoothing 0.1 \
 --max-tokens 8192 \
---max-update 20000 \
+--max-update 18000 \
 --no-progress-bar \
 --log-format json \
 --log-interval 100 \

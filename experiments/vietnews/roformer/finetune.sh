@@ -37,6 +37,7 @@ params="$DATADIR \
 --rotary-embedding \
 --scaling-type PI \
 --scaling-factor 2.0 \
+--no-token-positional-embeddings \
 --fp16
 "
 
