@@ -213,6 +213,9 @@ class TransformerConfig(FairseqDataclass):
     rotary_embedding: bool = field(
         default=False, metadata={"help": "whether use rotary embedding or not"}
     )
+    base: int = field(
+        default=10000, metadata={"help": "RoPE base"}
+    )
     scaling_type: str = field(
         default=None, metadata={"help": "type of scaling RoPE for finetune models"}
     )

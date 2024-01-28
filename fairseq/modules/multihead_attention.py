@@ -176,7 +176,7 @@ class MultiheadAttention(FairseqIncrementalDecoder):
 
     def _init_rope(self):
         if self.cfg.scaling_type is None:
-            self.rotary_emb = RotaryPositionalEmbedding(self.head_dim)
+            self.rotary_emb = RotaryPositionalEmbedding(self.head_dim, base=self.cfg.base)
         else:
             scaling_type = self.cfg.scaling_type
             scaling_factor = self.cfg.scaling_factor if self.cfg.scaling_factor is not None else 1.0
